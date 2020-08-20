@@ -1,23 +1,60 @@
-#include<stdio.h>
-#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE*)0)->MEMBER)
+#include <stdlib.h>
+#include <stdio.h>
 
-//braced group within expression
-#define container_of(PTR, TYPE, MEMBER)({                   \
-        const typeof(((TYPE *)0)->MEMBER)* __mptr = (PTR); \
-        (TYPE*)( (char*) __mptr -offsetof(TYPE, MEMBER));})
+#include "scheduler.h"
 
-struct radax {
-   int a;
-   int b;
-   char c;
-   unsigned int d;
+struct tester_args {
+    char *name;
+    int iters;
 };
 
-void main() {
- struct radax r;
- r.c = 'c';
- r.a = 4;r.b=5;
+struct mytask {
+   enum {
+      AST_CREATED,
+      AST_RUNNING,
+      AST_WAITING,
+   } astatus;
 
- printf("%ld\n", offsetof(struct radax, c)); 
- printf("%ld\n", offsetof(struct radax, a)); 
+   int id;
+
+   //resuming to the task is bascially doing a `longjmp` to this buf
+   jmp_buf buf;
+
+   void (*func)(void*);
+   void *arg;
+
+   struct sc_list_head task_list;
+
+   void* stack_bottom;
+   void* stack_top;
+   int stack_size;
+};
+void tester(void *arg)
+{
+    int i;
+    struct tester_args *ta = (struct tester_args *)arg;
+    for (i = 0; i < ta->iters; i++) {
+        printf("task %s: %d\n", ta->name, i);
+        scheduler_relinquish();
+    }
+    free(arg);
 }
+
+void create_test_task(char *name, int iters)
+{
+    struct tester_args *ta = malloc(sizeof(struct tester_args));
+    ta->name = name;
+    ta->iters = iters;
+    scheduler_create_task(tester, ta);
+}
+
+int main(int argc, char **argv)
+{
+    scheduler_init();
+    create_test_task("first", 10);
+    create_test_task("second", 10);
+    scheduler_run();
+    printf("\nFinished running all tasks!\n");
+    return EXIT_SUCCESS;
+}
+

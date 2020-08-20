@@ -5,6 +5,7 @@ void scheduler_init(void);
 void scheduler_create_task(void (*func)(void*), void* arg);
 
 void scheduler_run(void);
+static void schedule(void);
 
 void scheduler_exit_current_task(void);
 void scheduler_relinquish(void);
